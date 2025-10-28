@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # MongoDB Database Service
+  mongo:
+    image: mongo:latest
+    container_name: brandape-mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: brandape-backend
+    ports:
+      - '5001:5001'
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+      - MONGO_URI=mongodb://mongo:27017/brandape-dev
+      - JWT_SECRET=your_super_secret_jwt_key
+      - JWT_EXPIRE=30d
+      - ADMIN_EMAIL=admin@brandape.com
+      - ADMIN_PASSWORD=password123
+    depends_on:
+      - mongo
+    volumes:
+      # Mounts the local backend code into the container for live-reloading
+      - ./backend:/app
+      # Prevents local node_modules from overwriting the container's node_modules
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # This ensures the API proxy in Nginx works correctly
+        VITE_API_URL: /api
+    container_name: brandape-frontend
+    ports:
+      # Map host port 5173 to container's Nginx port 80
+      - '5173:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+    driver: local
